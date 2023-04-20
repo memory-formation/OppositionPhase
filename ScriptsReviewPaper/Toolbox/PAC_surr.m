@@ -1,6 +1,4 @@
 function phaseamp_surr = PAC_surr(PHASE, AMP, config)
-%similar to PAC_avg but with surrogate trials 
-%add to configuration config.n_iter for number of iterations. default = 200
 
 if isfield(config, 'n_iter') == 0
     n_iter = 200;
@@ -19,56 +17,108 @@ winsize = 2*pi/nbins;
 for j=1:nbins
     position(j) = -pi+(j-1)*winsize;
 end
-
-switch config.output
-    case 'MVL'
-        %for MOVI 
-        for bi = 1:n_iter
-            ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
-            showprogress(bi, n_iter)
-            r               = randperm(size(AMP, 1));
-            ampsh          = AMP(r, :, :);
-            ampbinsh       = BinData(PHASE, ampsh, config);
-            
-            for lf = 1:numlf
-                for hf = 1:numhf
-                    clear tmp
-                    tmp = squeeze(ampbinsh(lf, hf, :));
-                    modidx = abs(mean(tmp'.*exp(sqrt(-1)*position)));
-                    phaseamp_surr(bi, lf, hf) = modidx;
+switch config.shuffle
+    case 'TS'
+        
+        switch config.output
+            case 'MVL'
+                %for MOVI
+                for bi = 1:n_iter
+                    ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
+                    showprogress(bi, n_iter)
+                    %shuffle
+                    for trl = 1:size(AMP, 1)
+                        for hf = 1:size(AMP, 2)
+                            npnts = size(AMP, 3);
+                            cutpoint            = randsample(round(npnts/10):round(npnts*.9),1); %cut between 10% from beginning to 10% from the end
+                            ampsh(trl, hf, :) = AMP(trl, hf, [cutpoint:end 1:cutpoint-1]);
+                        end
+                    end
+                    
+                    ampbinsh       = BinData(PHASE, ampsh, config);
+                    
+                    for lf = 1:numlf
+                        for hf = 1:numhf
+                            clear tmp
+                            tmp = squeeze(ampbinsh(lf, hf, :));
+                            modidx = abs(mean(tmp'.*exp(sqrt(-1)*position)));
+                            phaseamp_surr(bi, lf, hf) = modidx;
+                        end
+                    end
                 end
-            end
+            case'DKL'
+                %for test with KL distance
+                for bi = 1:n_iter
+                    ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
+                    showprogress(bi, n_iter)
+                    for trl = 1:size(AMP, 1)
+                        for hf = 1:size(AMP, 2)
+                            npnts = size(AMP, 3);
+                            cutpoint            = randsample(round(npnts/10):round(npnts*.9),1); %cut between 10% from beginning to 10% from the end
+                            ampsh(trl, hf, :) = AMP(trl, hf, [cutpoint:end 1:cutpoint-1]);
+                        end
+                    end
+                    
+                    ampbinsh       = BinData(PHASE, ampsh, config);
+                    for lf = 1:numlf
+                        for hf = 1:numhf
+                            phaseamp_surr(bi, lf, hf) = Tort_MI(ampbinsh(lf, hf, :), config.nbins);
+                        end
+                    end
+                end
         end
-    case'DKL'
-        %for test with KL distance
-        for bi = 1:n_iter
-            ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
-            showprogress(bi, n_iter)
-            r               = randperm(size(AMP, 1));
-            ampsh          = AMP(r, :, :);
-            ampbinsh       = BinData(PHASE, ampsh, config);
-            for lf = 1:numlf
-                for hf = 1:numhf
-                    phaseamp_surr(bi, lf, hf) = Tort_MI(ampbinsh(lf, hf, :), config.nbins);
+        
+    case 'LS'
+        switch config.output
+            case 'MVL'
+                %for MOVI
+                for bi = 1:n_iter
+                    ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
+                    showprogress(bi, n_iter)
+                    r               = randperm(size(AMP, 1));
+                    ampsh          = AMP(r, :, :);
+                    ampbinsh       = BinData(PHASE, ampsh, config);
+                    
+                    for lf = 1:numlf
+                        for hf = 1:numhf
+                            clear tmp
+                            tmp = squeeze(ampbinsh(lf, hf, :));
+                            modidx = abs(mean(tmp'.*exp(sqrt(-1)*position)));
+                            phaseamp_surr(bi, lf, hf) = modidx;
+                        end
+                    end
                 end
-            end
-        end
-    case'both'
-              for bi = 1:n_iter
-            ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
-            showprogress(bi, n_iter)
-            r               = randperm(size(AMP, 1));
-            ampsh          = AMP(r, :, :);
-            ampbinsh       = BinData(PHASE, ampsh, config);
-            for lf = 1:numlf
-                for hf = 1:numhf
-                    clear tmp
-                    tmp = squeeze(ampbinsh(lf, hf, :));
-                    modidx = abs(mean(tmp'.*exp(sqrt(-1)*position)));
-                    MOVI(bi, lf, hf) = modidx;
-                    DKL(bi, lf, hf) = Tort_MI(ampbinsh(lf, hf, :), config.nbins);
+            case'DKL'
+                %for test with KL distance
+                for bi = 1:n_iter
+                    ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
+                    showprogress(bi, n_iter)
+                    r               = randperm(size(AMP, 1));
+                    ampsh          = AMP(r, :, :);
+                    ampbinsh       = BinData(PHASE, ampsh, config);
+                    for lf = 1:numlf
+                        for hf = 1:numhf
+                            phaseamp_surr(bi, lf, hf) = Tort_MI(ampbinsh(lf, hf, :), config.nbins);
+                        end
+                    end
                 end
-            end
+            case'both'
+                for bi = 1:n_iter
+                    ampbinsh =zeros(size(PHASE, 2), size(AMP, 2), config.nbins);
+                    showprogress(bi, n_iter)
+                    r               = randperm(size(AMP, 1));
+                    ampsh          = AMP(r, :, :);
+                    ampbinsh       = BinData(PHASE, ampsh, config);
+                    for lf = 1:numlf
+                        for hf = 1:numhf
+                            clear tmp
+                            tmp = squeeze(ampbinsh(lf, hf, :));
+                            modidx = abs(mean(tmp'.*exp(sqrt(-1)*position)));
+                            MOVI(bi, lf, hf) = modidx;
+                            DKL(bi, lf, hf) = Tort_MI(ampbinsh(lf, hf, :), config.nbins);
+                        end
+                    end
+                end
         end
 end
 % switch config.keepiter
